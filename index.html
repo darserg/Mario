@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>NES emulator</title>
+<style>
+:root{--bg:#c8cbd0;--panel:#e4e6e9;--ink:#1c1e23;--mute:#4f545d;--accent:#b3122d;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14161a;--panel:#1f2228;--ink:#e8e9eb;--mute:#a0a5ae;--accent:#ff5468;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#14161a;--panel:#1f2228;--ink:#e8e9eb;--mute:#a0a5ae;--accent:#ff5468;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Avenir Next",system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:800px;margin:0 auto;padding:24px 16px 40px}
+h1{font-size:1.7rem;margin:0 0 4px;letter-spacing:-.01em}
+.sub{color:var(--mute);margin:0 0 20px;max-width:60ch}
+.bezel{position:relative;background:var(--panel);padding:14px;border-radius:6px;border:2px solid var(--ink)}
+canvas{display:block;width:100%;aspect-ratio:256/240;background:#000;image-rendering:pixelated}
+.empty{position:absolute;inset:14px;display:flex;align-items:center;justify-content:center;background:#000;color:#e8e9eb;text-align:center;padding:16px}
+.empty[hidden]{display:none}
+.bar{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;align-items:center}
+button,.btn{font:inherit;padding:8px 16px;border:2px solid var(--ink);background:var(--panel);color:var(--ink);border-radius:4px;cursor:pointer;position:relative}
+.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button:focus-visible,.btn:focus-within{outline:3px solid var(--accent);outline-offset:2px}
+.sr{position:absolute;opacity:0;width:1px;height:1px;inset:0}
+#st{color:var(--mute);margin-left:4px}
+.help{color:var(--mute);font-size:.9rem;margin-top:16px;max-width:64ch}
+.hinge,.led,#pad{display:none}
+body,.sub,.help,#st{-webkit-user-select:text;user-select:text}
+#pad .dpad,#pad button{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:none}
+@media(pointer:coarse),(max-width:640px){
+main{padding:12px 12px 24px;display:flex;flex-direction:column}
+h1{order:3;font-size:1.2rem;margin-top:22px}
+.sub{order:4;font-size:.9rem;margin-bottom:10px}
+.help{order:5;margin-top:0}
+.bar{order:2}
+.sp{order:1;width:100%;max-width:460px;align-self:center;filter:drop-shadow(0 10px 16px rgba(0,0,0,.4))}
+.top{background:linear-gradient(160deg,#7394e4,#3f61b8 55%,#34509f);border-radius:30px 30px 6px 6px;padding:20px 18px 22px}
+.bezel{background:#16181c;border:0;border-radius:12px;padding:14px 14px 14px 26px}
+.empty{inset:14px 14px 14px 26px;font-size:.9rem}
+.led{display:block;position:absolute;left:10px;top:50%;width:6px;height:6px;border-radius:50%;background:#ff9f1c;box-shadow:0 0 7px #ff9f1c}
+.hinge{display:block;height:12px;margin:0 14px;background:linear-gradient(#22346f,#5272c0 50%,#27408a)}
+#pad{display:flex;justify-content:space-between;background:linear-gradient(200deg,#6286da,#3c5eb5 60%,#324d9a);border-radius:6px 6px 44px 44px;padding:24px 26px 36px}
+#pad .left,#pad .right{display:flex;flex-direction:column;gap:26px}
+#pad .right{align-items:flex-end}
+#pad .dpad{position:relative;width:108px;height:108px}
+#pad .dpad i{position:absolute;background:#26282f;border-radius:6px;box-shadow:0 3px 0 #101114}
+#pad .dpad i:nth-child(1){left:0;right:0;top:36px;bottom:36px}
+#pad .dpad i:nth-child(2){top:0;bottom:0;left:36px;right:36px}
+#pad .ss{display:flex;gap:16px;transform:rotate(-24deg);margin-left:10px}
+#pad .ss button{width:36px;height:11px;padding:0;border:0;border-radius:6px;background:#c9d0e4;box-shadow:0 2px 0 #1f3277}
+#pad .ab{display:flex;gap:18px;transform:rotate(-24deg);margin-top:14px}
+#pad .round{width:52px;height:52px;padding:0;border:0;border-radius:50%;background:radial-gradient(circle at 35% 30%,#555963,#25272d);color:#d3d9ea;font:700 16px/1 system-ui,sans-serif;box-shadow:0 4px 0 #101114}
+#pad button:active{transform:translateY(2px);filter:brightness(.85)}
+#pad .spk{width:84px;height:60px;border-radius:10px;overflow:hidden;background:repeating-linear-gradient(-62deg,transparent 0 8px,rgba(12,22,64,.6) 8px 11px)}
+}
+@media(pointer:coarse) and (orientation:landscape){
+main{padding:8px 12px}
+canvas{width:auto;max-width:100%;height:calc(100dvh - 110px)}
+.sp{max-width:none;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;background:linear-gradient(160deg,#6f91e2,#3f61b8 55%,#34509f);border-radius:34px;padding:12px 24px}
+.top{background:none;padding:0;border-radius:0;grid-column:2;grid-row:1}
+.hinge{display:none}
+#pad{display:contents}
+#pad .left{grid-column:1;grid-row:1;align-items:center}
+#pad .right{grid-column:3;grid-row:1;align-items:center}
+}
+</style>
+</head>
+<body>
+<main>
+<h1>NES emulator</h1>
+<p class="sub">Runs .nes cartridge files in your browser. It loads <em>Super Mario Bros.nes</em> from this folder automatically; add <code>?rom=File%20Name.nes</code> to the address to load another one, or choose a file yourself.</p>
+<div class="sp">
+<div class="top">
+<div class="bezel" id="drop">
+<canvas id="screen" width="256" height="240" aria-label="Game screen"></canvas>
+<div class="empty" id="empty">Drop a .nes file here, or choose one below.</div>
+<i class="led"></i>
+</div>
+</div>
+<div class="hinge"></div>
+<div id="pad" aria-label="Controller">
+<div class="left">
+<div class="dpad" id="dpad" aria-label="Directional pad"><i></i><i></i></div>
+<div class="ss"><button type="button" data-b="4" aria-label="Select"></button><button type="button" data-b="8" aria-label="Start"></button></div>
+</div>
+<div class="right">
+<div class="ab"><button type="button" class="round" data-b="2" aria-label="B">B</button><button type="button" class="round" data-b="1" aria-label="A">A</button></div>
+<div class="spk"></div>
+</div>
+</div>
+</div>
+<div class="bar">
+<label class="btn primary">Choose ROM<input class="sr" id="file" type="file" accept=".nes"></label>
+<button id="reset" type="button">Reset</button>
+<button id="pause" type="button">Pause</button>
+<span id="st" role="status">No ROM loaded.</span>
+</div>
+<p class="help">Arrow keys move, Z is B, X is A, Enter is Start and Shift is Select. Supported cartridges: NROM, MMC1, UxROM and CNROM (many early and mid-era games). Sound isn’t emulated yet.</p>
+</main>
+<script>
+"use strict";
+const $=s=>document.querySelector(s);
+const cv=$('#screen'),cx=cv.getContext('2d'),img=cx.createImageData(256,240),fb=new Uint32Array(img.data.buffer);
+fb.fill(0xff000000);
+const PAL=[0x666666,0x002A88,0x1412A7,0x3B00A4,0x5C007E,0x6E0040,0x6C0600,0x561D00,0x333500,0x0B4800,0x005200,0x004F08,0x00404D,0,0,0,
+0xADADAD,0x155FD9,0x4240FF,0x7527FE,0xA01ACC,0xB71E7B,0xB53120,0x994E00,0x6B6D00,0x388700,0x0C9300,0x008F32,0x007C8D,0,0,0,
+0xFFFEFF,0x64B0FF,0x9290FF,0xC676FF,0xF36AFF,0xFE6ECC,0xFE8170,0xEA9E22,0xBCBE00,0x88D800,0x5CE430,0x45E082,0x48CDDE,0x4F4F4F,0,0,
+0xFFFEFF,0xC0DFFF,0xD3D2FF,0xE8C8FF,0xFBC2FF,0xFEC4EA,0xFECCC5,0xF7D8A5,0xE4E594,0xCFEF96,0xBDF4AB,0xB3F3CC,0xB5EBF2,0xB8B8B8,0,0]
+ .map(c=>(0xff000000|(c&255)<<16|(c>>8&255)<<8|c>>16)>>>0);
+
+/* ---------- cartridge & mappers ---------- */
+let prg,chr,chrRam=false,mapper=0,romName='';
+const sram=new Uint8Array(8192),ram=new Uint8Array(2048),nt=new Uint8Array(2048),pal=new Uint8Array(32),oam=new Uint8Array(256);
+let prgMap=[0,0,0,0],chrMap=[0,0,0,0,0,0,0,0],ntMap=[0,0,1,1],mm=[12,0,0,0],msr=0,mn=0;
+const prg8=(i,b)=>{prgMap[i]=(b%(prg.length>>13))*8192};
+const chr1=(i,b)=>{chrMap[i]=(b%(chr.length>>10))*1024};
+const setMir=m=>{ntMap=[[0,0,1,1],[0,1,0,1],[0,0,0,0],[1,1,1,1]][m]};
+function mmcUpd(){
+ const c=mm[0],pm=(c>>2)&3,n=prg.length>>13;
+ setMir([2,3,1,0][c&3]);
+ if(pm<2){const b=(mm[3]&14)*2;for(let i=0;i<4;i++)prg8(i,b+i)}
+ else if(pm==2){const b=(mm[3]&15)*2;prg8(0,0);prg8(1,1);prg8(2,b);prg8(3,b+1)}
+ else{const b=(mm[3]&15)*2;prg8(0,b);prg8(1,b+1);prg8(2,n-2);prg8(3,n-1)}
+ if(c&16){for(let i=0;i<4;i++){chr1(i,mm[1]*4+i);chr1(4+i,mm[2]*4+i)}}
+ else for(let i=0;i<8;i++)chr1(i,(mm[1]&30)*4+i);
+}
+function mapInit(){
+ const n=prg.length>>13;
+ if(mapper==2){prg8(0,0);prg8(1,1);prg8(2,n-2);prg8(3,n-1)}
+ else if(mapper==1){mm=[12,0,0,0];msr=0;mn=0;mmcUpd();return}
+ else for(let i=0;i<4;i++)prg8(i,i);
+ for(let i=0;i<8;i++)chr1(i,i);
+}
+function mapWrite(a,v){
+ if(mapper==2){const b=(v&15)*2;prg8(0,b);prg8(1,b+1)}
+ else if(mapper==3){for(let i=0;i<8;i++)chr1(i,(v&3)*8+i)}
+ else if(mapper==1){
+  if(v&128){msr=0;mn=0;mm[0]|=12}
+  else{msr=(msr>>1)|((v&1)<<4);if(++mn==5){mm[(a>>13)&3]=msr;msr=0;mn=0}}
+  mmcUpd();
+ }
+}
+
+/* ---------- PPU ---------- */
+let ctrl=0,mask=0,status=0,oamA=0,va=0,ta=0,fx=0,wt=0,buf=0,nmi=0,budget=0;
+function pr(a){a&=0x3fff;if(a<0x2000)return chr[chrMap[a>>10]+(a&0x3ff)];if(a<0x3f00)return nt[ntMap[(a>>10)&3]*1024+(a&0x3ff)];a&=31;if((a&3)==0)a&=15;return pal[a]}
+function pw(a,d){a&=0x3fff;if(a<0x2000){if(chrRam)chr[chrMap[a>>10]+(a&0x3ff)]=d}else if(a<0x3f00)nt[ntMap[(a>>10)&3]*1024+(a&0x3ff)]=d;else{a&=31;if((a&3)==0)a&=15;pal[a]=d&63}}
+function ppuR(r){
+ if(r==2){const s=status;status&=0x7f;wt=0;return s}
+ if(r==4)return oam[oamA];
+ if(r==7){let o;if((va&0x3fff)>=0x3f00){o=pr(va);buf=pr(va-0x1000)}else{o=buf;buf=pr(va)}va=(va+(ctrl&4?32:1))&0x7fff;return o}
+ return 0;
+}
+function ppuW(r,d){
+ switch(r){
+  case 0:if(!(ctrl&128)&&(d&128)&&(status&128))nmi=1;ctrl=d;ta=(ta&0x73ff)|((d&3)<<10);break;
+  case 1:mask=d;break;
+  case 3:oamA=d;break;
+  case 4:oam[oamA]=d;oamA=(oamA+1)&255;break;
+  case 5:if(!wt){ta=(ta&0x7fe0)|(d>>3);fx=d&7}else ta=(ta&0x0c1f)|((d&7)<<12)|((d>>3)<<5);wt^=1;break;
+  case 6:if(!wt)ta=(ta&0xff)|((d&0x3f)<<8);else{ta=(ta&0x7f00)|d;va=ta}wt^=1;break;
+  case 7:pw(va,d);va=(va+(ctrl&4?32:1))&0x7fff;break;
+ }
+}
+const bgb=new Uint8Array(256),spb=new Uint8Array(256),spp=new Uint8Array(256);
+function renderLine(y){
+ const bgOn=mask&8,spOn=mask&16,bp=ctrl&16?0x1000:0;
+ let a=va;
+ if(bgOn){
+  for(let tl=0;tl<33;tl++){
+   const id=pr(0x2000|(a&0xfff));
+   const at=(pr(0x23c0|(a&0xc00)|((a>>4)&0x38)|((a>>2)&7))>>(((a>>4)&4)|(a&2)))&3;
+   const ad=bp+id*16+((a>>12)&7),lo=pr(ad),hi=pr(ad+8);
+   for(let b=0;b<8;b++){const px=tl*8+b-fx;if(px>=0&&px<256){const c=((lo>>(7-b))&1)|(((hi>>(7-b))&1)<<1);bgb[px]=c?(at<<2)|c:0}}
+   if((a&31)==31)a=(a&~31)^0x400;else a++;
+  }
+  if(!(mask&2))bgb.fill(0,0,8);
+ }else bgb.fill(0);
+ spb.fill(0);
+ if(spOn){
+  const h=ctrl&32?16:8,list=[];let cnt=0,hit=0;
+  for(let i=0;i<64&&cnt<9;i++){const r=y-oam[i*4]-1;if(r>=0&&r<h){if(cnt<8)list.push(i);cnt++}}
+  if(cnt>8)status|=0x20;
+  for(let k=list.length-1;k>=0;k--){
+   const i=list[k],o=i*4,tile=oam[o+1],at=oam[o+2],sx=oam[o+3];
+   let r=y-oam[o]-1;if(at&128)r=h-1-r;
+   const ad=h==8?(ctrl&8?0x1000:0)+tile*16+r:(tile&1)*0x1000+(tile&254)*16+(r&7)+(r>7?16:0);
+   const lo=pr(ad),hi=pr(ad+8);
+   for(let b=0;b<8;b++){
+    const s=at&64?b:7-b,c=((lo>>s)&1)|(((hi>>s)&1)<<1),px=sx+b;
+    if(c&&px<256&&(px>=8||(mask&4))){spb[px]=16|((at&3)<<2)|c;spp[px]=at&32;if(i==0&&bgOn&&bgb[px]&&px<255)hit=1}
+   }
+  }
+  if(hit)status|=0x40;
+ }
+ const bc=PAL[pal[0]&63],o=y*256;
+ for(let px=0;px<256;px++){const s=spb[px],b=bgb[px];fb[o+px]=s&&(!spp[px]||!b)?PAL[pal[s]]:b?PAL[pal[b]]:bc}
+}
+
+/* ---------- input ---------- */
+let joy=0,sh=0,strobe=0;
+
+/* ---------- CPU bus ---------- */
+function rd(a){
+ if(a<0x2000)return ram[a&0x7ff];
+ if(a>=0x8000)return prg[prgMap[(a>>13)&3]+(a&0x1fff)];
+ if(a<0x4000)return ppuR(a&7);
+ if(a==0x4016){if(strobe)sh=joy;const r=(sh&1)|0x40;if(!strobe)sh=(sh>>1)|0x80;return r}
+ if(a>=0x6000)return sram[a&0x1fff];
+ return 0;
+}
+function wr(a,v){
+ if(a<0x2000)ram[a&0x7ff]=v;
+ else if(a<0x4000)ppuW(a&7,v);
+ else if(a==0x4014){const b=v<<8;for(let i=0;i<256;i++)oam[(oamA+i)&255]=rd(b+i);budget-=513}
+ else if(a==0x4016){strobe=v&1;sh=joy}
+ else if(a>=0x8000)mapWrite(a,v);
+ else if(a>=0x6000)sram[a&0x1fff]=v;
+}
+const rd16=a=>rd(a)|(rd((a+1)&0xffff)<<8);
+
+/* ---------- 6502 ---------- */
+let pc=0,sp=0xfd,rA=0,rX=0,rY=0,fC=0,fZ=0,fI=1,fD=0,fV=0,fN=0,cy=0,cross=0;
+const push=d=>{ram[256+sp]=d&255;sp=(sp-1)&255};
+const pull=()=>{sp=(sp+1)&255;return ram[256+sp]};
+const getP=b=>(fN<<7)|(fV<<6)|32|(b<<4)|(fD<<3)|(fI<<2)|(fZ<<1)|fC;
+const setP=p=>{fC=p&1;fZ=(p>>1)&1;fI=(p>>2)&1;fD=(p>>3)&1;fV=(p>>6)&1;fN=p>>7};
+const nz=r=>{fZ=r==0?1:0;fN=r>>7};
+function adc(m){const s=rA+m+fC;fV=(~(rA^m)&(rA^s)&128)?1:0;fC=s>>8;rA=s&255;nz(rA)}
+function cmp(r,m){const d=r-m;fC=d>=0?1:0;nz(d&255)}
+function shf(aa,m){
+ let n;
+ if(aa==0){fC=m>>7;m=(m<<1)&255}
+ else if(aa==1){n=m>>7;m=((m<<1)|fC)&255;fC=n}
+ else if(aa==2){fC=m&1;m>>=1}
+ else{n=m&1;m=(m>>1)|(fC<<7);fC=n}
+ nz(m);return m;
+}
+function EA(cc,bb,aa){
+ let b,t,e;
+ switch(bb){
+  case 0:if(cc==1){t=(rd(pc++)+rX)&255;cy=6;return rd(t)|(rd((t+1)&255)<<8)}cy=2;return pc++;
+  case 1:cy=3;return rd(pc++);
+  case 2:cy=2;return pc++;
+  case 3:cy=4;e=rd16(pc);pc+=2;return e;
+  case 4:t=rd(pc++);b=rd(t)|(rd((t+1)&255)<<8);e=(b+rY)&0xffff;cy=5;cross=((b^e)&0xff00)?1:0;return e;
+  case 5:cy=4;return (rd(pc++)+((cc==2&&(aa==4||aa==5))?rY:rX))&255;
+  case 6:b=rd16(pc);pc+=2;e=(b+rY)&0xffff;cy=4;cross=((b^e)&0xff00)?1:0;return e;
+  default:b=rd16(pc);pc+=2;e=(b+((cc==2&&aa==5)?rY:rX))&0xffff;cy=4;cross=((b^e)&0xff00)?1:0;return e;
+ }
+}
+function step(){
+ if(nmi){nmi=0;push(pc>>8);push(pc);push(getP(0));fI=1;pc=rd16(0xfffa);return 7}
+ const op=rd(pc++),cc=op&3,bb=(op>>2)&7,aa=op>>5;
+ let ea,m;cy=2;cross=0;
+ if(cc==1){
+  ea=EA(1,bb,aa);
+  if(aa==4){wr(ea,rA);if(bb==4||bb>5)cy++;return cy}
+  m=rd(ea);
+  switch(aa){
+   case 0:rA|=m;nz(rA);break;
+   case 1:rA&=m;nz(rA);break;
+   case 2:rA^=m;nz(rA);break;
+   case 3:adc(m);break;
+   case 5:rA=m;nz(rA);break;
+   case 6:cmp(rA,m);break;
+   case 7:adc(m^255);break;
+  }
+  return cy+cross;
+ }
+ if(cc==2){
+  if(bb==2){
+   if(aa<4)rA=shf(aa,rA);
+   else if(aa==4){rA=rX;nz(rA)}
+   else if(aa==5){rX=rA;nz(rX)}
+   else if(aa==6){rX=(rX-1)&255;nz(rX)}
+   return 2;
+  }
+  if(bb==6){if(aa==4)sp=rX;else if(aa==5){rX=sp;nz(rX)}return 2}
+  if(bb==4)return 2;
+  ea=EA(2,bb,aa);
+  if(aa==4){wr(ea,rX);return cy}
+  if(aa==5){rX=rd(ea);nz(rX);return cy+cross}
+  m=rd(ea);
+  if(aa<4)m=shf(aa,m);else{m=(aa==6?m-1:m+1)&255;nz(m)}
+  wr(ea,m);
+  return cy+2+(bb==7?1:0);
+ }
+ if(cc==0){
+  if(bb==4){
+   const o=rd(pc++),f=[fN,fV,fC,fZ][aa>>1];
+   if(f==(aa&1)){const np=(pc+(o<128?o:o-256))&0xffff;cy+=1+(((np^pc)&0xff00)?1:0);pc=np}
+   return cy;
+  }
+  if(bb==2){
+   switch(aa){
+    case 0:push(getP(1));return 3;
+    case 1:setP(pull());return 4;
+    case 2:push(rA);return 3;
+    case 3:rA=pull();nz(rA);return 4;
+    case 4:rY=(rY-1)&255;nz(rY);break;
+    case 5:rY=rA;nz(rY);break;
+    case 6:rY=(rY+1)&255;nz(rY);break;
+    default:rX=(rX+1)&255;nz(rX);
+   }
+   return 2;
+  }
+  if(bb==6){
+   switch(aa){
+    case 0:fC=0;break;case 1:fC=1;break;case 2:fI=0;break;case 3:fI=1;break;
+    case 4:rA=rY;nz(rA);break;case 5:fV=0;break;case 6:fD=0;break;default:fD=1;
+   }
+   return 2;
+  }
+  if(bb==0&&aa<4){
+   if(aa==0){pc++;push(pc>>8);push(pc);push(getP(1));fI=1;pc=rd16(0xfffe);return 7}
+   if(aa==1){const t=pc+1;push(t>>8);push(t);pc=rd16(pc);return 6}
+   if(aa==2){setP(pull());pc=pull();pc|=pull()<<8;return 6}
+   pc=pull();pc|=pull()<<8;pc=(pc+1)&0xffff;return 6;
+  }
+  ea=EA(0,bb,aa);
+  if(bb==3&&aa==2){pc=ea;return 3}
+  if(bb==3&&aa==3){pc=rd(ea)|(rd((ea&0xff00)|((ea+1)&255))<<8);return 5}
+  switch(aa){
+   case 1:if(bb<4){m=rd(ea);fZ=(rA&m)?0:1;fN=m>>7;fV=(m>>6)&1}break;
+   case 4:wr(ea,rY);break;
+   case 5:rY=rd(ea);nz(rY);return cy+cross;
+   case 6:cmp(rY,rd(ea));break;
+   case 7:cmp(rX,rd(ea));break;
+  }
+  return cy;
+ }
+ return 2;
+}
+
+/* ---------- frame loop ---------- */
+function frame(){
+ for(let ln=0;ln<262;ln++){
+  if(ln<240){
+   if(mask&24){
+    renderLine(ln);
+    if((va&0x7000)!=0x7000)va+=0x1000;
+    else{va&=~0x7000;let yy=(va&0x3e0)>>5;if(yy==29){yy=0;va^=0x800}else if(yy==31)yy=0;else yy++;va=(va&~0x3e0)|(yy<<5)}
+    va=(va&~0x41f)|(ta&0x41f);
+   }else fb.fill(PAL[pal[0]&63],ln*256,ln*256+256);
+  }else if(ln==241){status|=0x80;if(ctrl&0x80)nmi=1}
+  else if(ln==261){status&=0x1f;if(mask&24)va=ta}
+  budget+=113.667;
+  while(budget>0)budget-=step();
+ }
+}
+let running=false,paused=false,last=0,acc=0;
+function loop(ts){
+ requestAnimationFrame(loop);
+ acc+=Math.min(ts-last,50);last=ts;
+ if(!running||paused){acc=0;return}
+ let n=0;
+ while(acc>=16.64&&n<3){frame();acc-=16.64;n++}
+ if(n)cx.putImageData(img,0,0);
+}
+requestAnimationFrame(loop);
+
+/* ---------- loading & UI ---------- */
+const msg=t=>{$('#st').textContent=t};
+function reset(){
+ ram.fill(0);nt.fill(0);pal.fill(0);oam.fill(0);
+ ctrl=mask=status=oamA=va=ta=fx=wt=buf=nmi=0;budget=0;
+ mapInit();
+ rA=rX=rY=0;sp=0xfd;fC=fZ=fD=fV=fN=0;fI=1;
+ pc=rd16(0xfffc);
+ fb.fill(0xff000000);
+}
+function load(bytes,name){
+ const d=new Uint8Array(bytes);
+ if(d[0]!=78||d[1]!=69||d[2]!=83||d[3]!=26){msg('That isn’t an iNES (.nes) file.');return}
+ const m=(d[6]>>4)|(d[7]&240);
+ if(m>3){msg('Mapper '+m+' isn’t supported yet. Try an NROM, MMC1, UxROM or CNROM game.');return}
+ let o=16+(d[6]&4?512:0);
+ prg=d.slice(o,o+d[4]*16384);o+=d[4]*16384;
+ chrRam=!d[5];chr=chrRam?new Uint8Array(8192):d.slice(o,o+d[5]*8192);
+ if(!prg.length){msg('This ROM has no program data.');return}
+ mapper=m;setMir(d[6]&1?1:0);sram.fill(0);
+ reset();
+ $('#empty').hidden=true;
+ running=true;paused=false;$('#pause').textContent='Pause';
+ msg(name+' (mapper '+m+')');
+}
+async function openFile(f){if(f)load(await f.arrayBuffer(),f.name.replace(/\.nes$/i,''))}
+$('#file').addEventListener('change',e=>{openFile(e.target.files[0]);e.target.value=''});
+$('#reset').onclick=()=>{if(prg)reset()};
+$('#pause').onclick=()=>{if(!prg)return;paused=!paused;$('#pause').textContent=paused?'Resume':'Pause'};
+const drop=$('#drop');
+['dragover','drop'].forEach(t=>document.addEventListener(t,e=>{e.preventDefault();if(t=='drop')openFile(e.dataTransfer.files[0])}));
+
+/* Auto-load a ROM that sits next to this page. Override with ?rom=Other%20Game.nes */
+const ROM=new URLSearchParams(location.search).get('rom')||'Super Mario Bros.nes';
+async function autoload(){
+ if(location.protocol=='file:'){msg('Opened from disk, so the browser blocks loading '+ROM+'. Serve this folder with python3 -m http.server, or choose a ROM.');return}
+ try{
+  msg('Loading '+ROM+'…');
+  const r=await fetch(encodeURIComponent(ROM));
+  if(!r.ok)throw new Error(r.status);
+  load(await r.arrayBuffer(),ROM.replace(/\.nes$/i,''));
+ }catch(err){msg(ROM+' wasn’t found next to this page. Choose a ROM instead.')}
+}
+autoload();
+
+const KEYS={KeyX:1,KeyZ:2,ShiftLeft:4,ShiftRight:4,Enter:8,ArrowUp:16,ArrowDown:32,ArrowLeft:64,ArrowRight:128};
+addEventListener('keydown',e=>{const b=KEYS[e.code];if(b&&!e.metaKey&&!e.ctrlKey){joy|=b;e.preventDefault()}});
+addEventListener('keyup',e=>{const b=KEYS[e.code];if(b){joy&=~b;e.preventDefault()}});
+document.querySelectorAll('[data-b]').forEach(el=>{
+ const b=+el.dataset.b;
+ el.addEventListener('pointerdown',ev=>{ev.preventDefault();el.setPointerCapture(ev.pointerId);joy|=b});
+ ['pointerup','pointercancel'].forEach(t=>el.addEventListener(t,()=>{joy&=~b}));
+});
+/* D-pad: one touch surface, so sliding the thumb changes direction and diagonals work */
+const dp=$('#dpad'),DIRS=16|32|64|128;
+function dpSet(e){
+ const r=dp.getBoundingClientRect(),dx=(e.clientX-r.left)/r.width-.5,dy=(e.clientY-r.top)/r.height-.5;
+ let b=0;if(dx>.14)b|=128;if(dx<-.14)b|=64;if(dy>.14)b|=32;if(dy<-.14)b|=16;
+ joy=(joy&~DIRS)|b;
+}
+dp.addEventListener('pointerdown',e=>{e.preventDefault();dp.setPointerCapture(e.pointerId);dpSet(e)});
+dp.addEventListener('pointermove',e=>{if(dp.hasPointerCapture(e.pointerId))dpSet(e)});
+['pointerup','pointercancel'].forEach(t=>dp.addEventListener(t,()=>{joy&=~DIRS}));
+addEventListener('contextmenu',e=>{if(e.target.closest('#pad'))e.preventDefault()});
+</script>
+</body>
+</html>
