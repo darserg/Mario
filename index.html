@@ -575,13 +575,12 @@
     </head>
     <body>
         <main>
-            <h1>NES emulator</h1>
             <div class="sp">
                 <div class="console" aria-hidden="true">
                     <div class="door"><span id="cart">NO CARTRIDGE</span></div>
                     <div class="row">
-                        <i class="pled"></i><b class="stripe"></b>
-                        <i class="port"></i><i class="port"></i>
+                        <i class="pled"></i><b class="stripe"></b
+                        ><i class="port"></i><i class="port"></i>
                     </div>
                 </div>
                 <div class="top">
@@ -609,8 +608,7 @@
                             id="dpad"
                             aria-label="Directional pad"
                         >
-                            <i></i>
-                            <i></i>
+                            <i></i><i></i>
                         </div>
                         <div class="ss">
                             <button
@@ -659,11 +657,10 @@
                 <button id="pause" type="button">Pause</button>
                 <span id="st" role="status">No ROM loaded.</span>
             </div>
-            <p class="help">
-                Arrow keys move, Z is B, X is A, Enter is Start and Shift is
-                Select. Supported cartridges: NROM, MMC1, UxROM and CNROM (many
-                early and mid-era games). Sound isn’t emulated yet.
-            </p>
+            <!--<p class="help">
+                Arrow keys or W, A, S, D move, Z is B, X is A, Enter is Start
+                and Shift is Select.
+            </p>-->
         </main>
         <script>
             "use strict";
@@ -1567,6 +1564,10 @@
                 ArrowDown: 32,
                 ArrowLeft: 64,
                 ArrowRight: 128,
+                KeyW: 16,
+                KeyS: 32,
+                KeyA: 64,
+                KeyD: 128,
             };
             addEventListener("keydown", (e) => {
                 const b = KEYS[e.code];
